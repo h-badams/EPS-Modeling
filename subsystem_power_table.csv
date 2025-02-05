@@ -1,0 +1,15 @@
+Subsystem,Mode,Voltage (V),Duty Cycle,Equiv. Minutes,Power (W),Energy (Wh),Dis. Current (A)
+Reaction Wheels,Standard Power Draw,12,90.00%,81,10,13.5,0.8333333333
+Reaction Wheels,Max Power Draw,12,10.00%,9,15,2.25,1.25
+Star Tracker,Computing,5,80.00%,72,5,6,1
+Star Tracker,Imaging/Readout,6,10.00%,9,10,1.5,1.666666667
+Star Tracker,Idle,5,10.00%,9,2,0.3,0.4
+Earth Tracker,Computing,5,80.00%,72,5,6,1
+Earth Tracker,Imaging/Readout,6,10.00%,9,10,1.5,1.666666667
+Earth Tracker,Idle,5,10.00%,9,2,0.3,0.4
+Magnetorquers,Operational,3,100.00%,90,3,4.5,1
+Comms,Transmitting,12,25%,22.5,20,7.5,1.666666667
+Comms,Standard,12,75.00%,90,10,15,0.8333333333
+Power,Thermal Control,2,100.00%,90,2,3,1
+Solar Panels,Selfie Cam,2,100.00%,90,0.5,0.75,0.25
+Flight Computer,Operational,3.6,100.00%,90,0.5,0.75,0.1388888889
