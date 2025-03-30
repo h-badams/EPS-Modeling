@@ -1,6 +1,9 @@
 import csv
 import numpy as np
 
+# Much of this is GPT generated - it works, but there may be much cleaner ways
+# this stuff
+
 def read_power_table(filename):
     """Reads the power table from a CSV file, supporting multiple modes per subsystem."""
     subsystems = {}
@@ -27,32 +30,39 @@ def read_power_table(filename):
             mode_list.append(mode)  # Store in flat list
             mode_indices[name].append(len(mode_list) - 1)  # Track mode indices for each subsystem
     return subsystems, mode_list, mode_indices
-
-def generate_schedule(subsystems, mode_list, mode_indices, orbit_duration=90, time_step=2):
-    """Generates a schedule that ensures correct duty cycles and balances power consumption."""
+    
+def generate_schedule(subsystems, mode_list, orbit_duration=90, time_step=2):
+    """Generates a schedule ensuring correct duty cycles and balanced power consumption."""
     time_slots = orbit_duration // time_step
     schedule = np.zeros((len(mode_list), time_slots), dtype=int)
     
+    # Dictionary to track which time slots are used by each subsystem
+    subsystem_active_slots = {sub: set() for sub in subsystems}
+
     for sub, modes in subsystems.items():
-        total_slots = sum(int(mode["duty_cycle"] * time_slots) for mode in modes)
-        if total_slots > time_slots:
-            raise ValueError(f"Total duty cycle for {sub} exceeds 100% of available slots.")
+        available_slots = list(range(time_slots))  # Create a list of all available time slots
+        np.random.shuffle(available_slots)  # Shuffle to distribute load
         
-        slot_indices = list(range(time_slots))
-        np.random.shuffle(slot_indices)  # Randomize slot selection to distribute power load
-        
-        mode_start = 0
-        for mode, mode_idx in zip(modes, mode_indices[sub]):
-            active_slots = int(mode["duty_cycle"] * time_slots)
-            selected_slots = sorted(slot_indices[mode_start:mode_start + active_slots])
-            mode_start += active_slots
+        for mode in modes:
+            active_slots = int(mode["duty_cycle"] * time_slots)  # Number of slots this mode should be active
+            mode_index = mode_list.index(mode)
+
+            # Ensure that we do not overlap modes for the same subsystem
+            selected_slots = []
+            for slot in available_slots:
+                if len(selected_slots) >= active_slots:
+                    break
+                if slot not in subsystem_active_slots[sub]:  # Ensure no overlap
+                    selected_slots.append(slot)
+                    subsystem_active_slots[sub].add(slot)  # Mark slot as used for this subsystem
             
+            selected_slots.sort()  # Sort to keep chronological order
             for t in selected_slots:
-                # Ensure no other mode of the same subsystem is active at this time
-                for idx in mode_indices[sub]:
-                    schedule[idx, t] = 0  # Turn off other modes of the same subsystem
-                schedule[mode_idx, t] = 1  # Activate the selected mode
-    
+                schedule[mode_index, t] = 1  # Activate the mode at the chosen time slot
+
+            # Remove selected slots from available pool
+            available_slots = [slot for slot in available_slots if slot not in selected_slots]
+
     return schedule
 
 def write_schedule(schedule, mode_list, filename="power_schedule.csv", time_step=2):
@@ -61,18 +71,19 @@ def write_schedule(schedule, mode_list, filename="power_schedule.csv", time_step
     
     with open(filename, mode="w", newline="") as file:
         writer = csv.writer(file)
-        header = ["Time (min)"] + [f"{mode['subsystem']} - {mode['mode']}" for mode in mode_list] + ["Total Power (W)"]
+        header = ["Time (min)"] + [f"{mode['subsystem']} - {mode['mode']}" for mode in mode_list] + ["Total Power (W)", "Net Discharge Current (A)"]
         writer.writerow(header)
         
         for t in range(time_slots):
             time = t * time_step
             states = schedule[:, t]
             total_power = sum(states[i] * mode_list[i]["power"] for i in range(len(states)))
-            writer.writerow([time] + list(states) + [total_power])
+            net_discharge_current = sum(states[i] * mode_list[i]["current"] for i in range(len(states)))
+            writer.writerow([time] + list(states) + [total_power, net_discharge_current])
 
 def main():
-    subsystems, mode_list, mode_indices = read_power_table("subsystem_power_table.csv")
-    schedule = generate_schedule(subsystems, mode_list, mode_indices)
+    subsystems, mode_list, mode_indices = read_power_table("Pack Model V1/subsystem_power_table.csv")
+    schedule = generate_schedule(subsystems, mode_list, time_step=1)
     write_schedule(schedule, mode_list, time_step=1)
     print("Power schedule generated and saved to power_schedule.csv.")
 
