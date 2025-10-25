@@ -9,6 +9,7 @@ import pandas as pd
 import pybamm
 import liionpack as lp
 
+
 #%%
 params = pybamm.ParameterValues('Chen2020')
 
@@ -52,6 +53,22 @@ models = [pybamm.lithium_ion.SPM({"SEI": "ec reaction limited"}), pybamm.lithium
 
 sims = [pybamm.Simulation(model=model, parameter_values=params, experiment=experiment) for model in models]
 sols = [sim.solve() for sim in sims]
+
+def run_experiment(test_conditions, params):
+    starting_voltage, discharge_current, minutes = test_conditions
+    experiment = pybamm.Experiment(
+        [10 * (f"Discharge at 0.5A until {starting_voltage}V",
+        "Rest for 1 hour"),
+        (f"Discharge at {discharge_current}A for {minutes} minutes",
+        "Rest for 30 seconds")
+        ], period="10 seconds"
+    )
+    model = pybamm.lithium_ion.DFN()
+    sim = pybamm.Simulation(model=model, parameter_values=params, experiment=experiment)
+    sol = sim.solve()
+    
+    return sol['Time [s]'].entries, sol['Terminal voltage [V]'].entries
+
 
 #%%
 pybamm.dynamic_plot(sols, ["Voltage [V]"])
@@ -121,3 +138,51 @@ plt.grid(True)
 
 # Show plot
 plt.show()
+
+if __name__ == '__main__':
+    
+    # load all test params (discharge curve and starting info)
+    
+    initial_conditions = [(), (), ()] # tuples are (starting voltage, minutes of test)
+    
+    # test_curves = get_discharge_curves(file paths)
+    
+    # below we run a lot of pybamm experiments
+    param_sets = ['Chen2020']
+    params_to_change = []
+    
+    floats_to_change_by = [0.8 + 0.05 * i for i in range(5)]
+    increment = 0.05
+    min_float = 0.8
+    max_float = 1.0
+    
+    for x in param_sets:
+        params = pybamm.ParameterValues[x]
+        
+        pointer = 0
+        place_values = [min_float for p in params_to_change]
+        
+        while pointer < len(params_to_change):
+            pointer = 0
+            
+            for i, param in enumerate(params_to_change):
+                params.update({param : params[param] * place_values[i]})
+
+            # run pybamm experiments (one for each piece of test data)
+            
+            for test in test_set:
+                initial_condition, discharge_curve = test
+                
+                prediction_curve = run_experiment(test_conditions=())
+                
+                # measure mse
+                # record if best
+            
+            while pointer < len(params_to_change) and abs(place_values[pointer] - max_float) < 1e-9:
+                place_values[pointer] = min_float
+                pointer += 1
+            if pointer < len(params_to_change):
+                place_values[pointer] += increment
+            
+
+    # plot best, print mse
